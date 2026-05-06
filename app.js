@@ -1,12 +1,22 @@
 /* app.js */
 const STORAGE_KEY = 'nexusOS_data';
 
+// Utilities
+function formatDate(d) {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+const today = new Date();
+let currentDate = new Date();
+let currentView = 'day'; // 'day', 'week', 'month'
+
+// Generate Dynamic Default Data so events show up today
 const defaultData = {
     events: [
-        { id: '1', title: 'Deep Work', start: '09:00', end: '11:30', category: 'Work', color: 'var(--cat-work)' },
-        { id: '2', title: 'Calisthenics', start: '12:00', end: '13:00', category: 'Health', color: 'var(--cat-health)' },
-        { id: '3', title: 'Digital Privacy Project', start: '14:00', end: '16:00', category: 'Learning', color: 'var(--cat-learning)' },
-        { id: '4', title: 'Time with Wife', start: '18:00', end: '20:00', category: 'Marriage', color: 'var(--cat-marriage)' }
+        { id: '1', title: 'Deep Work', date: formatDate(today), start: '09:00', end: '11:30', category: 'Work', color: 'var(--cat-work)' },
+        { id: '2', title: 'Calisthenics', date: formatDate(today), start: '12:00', end: '13:00', category: 'Health', color: 'var(--cat-health)' },
+        { id: '3', title: 'Digital Privacy Project', date: formatDate(today), start: '14:00', end: '16:00', category: 'Learning', color: 'var(--cat-learning)' },
+        { id: '4', title: 'Time with Wife', date: formatDate(today), start: '18:00', end: '20:00', category: 'Marriage', color: 'var(--cat-marriage)' }
     ],
     tasks: [
         { id: 't1', text: 'Review PRs', completed: false },
@@ -30,6 +40,7 @@ const defaultData = {
 };
 
 let appData = JSON.parse(localStorage.getItem(STORAGE_KEY)) || defaultData;
+let clockInterval;
 
 function saveData() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
@@ -38,26 +49,24 @@ function saveData() {
 
 // Initialization
 document.addEventListener('DOMContentLoaded', () => {
-    initHeader();
-    initTimeline();
+    initTimelineLabels();
     renderCategories();
-    renderEvents();
     renderTasks();
     renderHabits();
     updateDashboardStats();
-    startClock();
     setupEventListeners();
+    renderCalendar();
+    
+    // Initial scroll to current time in timeline
+    setTimeout(() => {
+        const scrollPos = (today.getHours() * 60) - 100;
+        document.getElementById('timeline-body').scrollTop = scrollPos > 0 ? scrollPos : 0;
+    }, 100);
 });
 
-function initHeader() {
-    const now = new Date();
-    const options = { weekday: 'long', month: 'long', day: 'numeric' };
-    document.getElementById('current-date-title').textContent = "Today";
-    document.getElementById('current-date-subtitle').textContent = now.toLocaleDateString('en-US', options);
-}
-
-function initTimeline() {
+function initTimelineLabels() {
     const labelsContainer = document.getElementById('time-labels');
+    labelsContainer.innerHTML = '';
     for (let i = 0; i < 24; i++) {
         const div = document.createElement('div');
         div.className = 'time-label';
@@ -66,23 +75,146 @@ function initTimeline() {
     }
 }
 
-function renderCategories() {
-    const list = document.getElementById('category-list');
-    list.innerHTML = '';
-    appData.categories.forEach(cat => {
-        const li = document.createElement('li');
-        li.className = 'category-item';
-        li.innerHTML = `<div class="cat-dot" style="background: ${cat.color}"></div> <span>${cat.name}</span>`;
-        list.appendChild(li);
+// Calendar Rendering Logic
+function renderCalendar() {
+    updateHeaderDate();
+    if (currentView === 'day') renderDayView();
+    else if (currentView === 'week') renderWeekView();
+    else if (currentView === 'month') renderMonthView();
+    
+    startClock();
+}
+
+function updateHeaderDate() {
+    const title = document.getElementById('current-date-title');
+    const subtitle = document.getElementById('current-date-subtitle');
+    
+    if (currentView === 'day') {
+        const isToday = formatDate(currentDate) === formatDate(new Date());
+        title.textContent = isToday ? "Today" : currentDate.toLocaleDateString('en-US', {weekday: 'long'});
+        subtitle.textContent = currentDate.toLocaleDateString('en-US', {month: 'long', day: 'numeric', year: 'numeric'});
+    } else if (currentView === 'week') {
+        title.textContent = "This Week";
+        const start = new Date(currentDate);
+        const day = start.getDay() || 7;
+        start.setDate(start.getDate() - day + 1);
+        const end = new Date(start);
+        end.setDate(end.getDate() + 6);
+        subtitle.textContent = `${start.toLocaleDateString('en-US', {month: 'short', day: 'numeric'})} - ${end.toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: 'numeric'})}`;
+    } else if (currentView === 'month') {
+        title.textContent = currentDate.toLocaleDateString('en-US', {month: 'long'});
+        subtitle.textContent = currentDate.getFullYear();
+    }
+}
+
+function renderDayView() {
+    document.getElementById('month-view-container').classList.add('hidden');
+    document.getElementById('timeline-body').classList.remove('hidden');
+    document.getElementById('timeline-header').classList.remove('hidden');
+    
+    // Headers
+    const headers = document.getElementById('day-headers');
+    const isToday = formatDate(currentDate) === formatDate(new Date());
+    headers.innerHTML = `<div class="day-header ${isToday ? 'active' : ''}">${currentDate.toLocaleDateString('en-US', {weekday: 'long', month: 'short', day: 'numeric'})}</div>`;
+    
+    // Grid
+    const grid = document.getElementById('time-grid');
+    grid.className = 'time-grid';
+    grid.innerHTML = isToday ? '<div class="current-time-indicator" id="time-indicator"></div>' : '';
+    
+    const dayEvents = appData.events.filter(e => e.date === formatDate(currentDate));
+    renderEventsToContainer(dayEvents, grid);
+}
+
+function renderWeekView() {
+    document.getElementById('month-view-container').classList.add('hidden');
+    document.getElementById('timeline-body').classList.remove('hidden');
+    document.getElementById('timeline-header').classList.remove('hidden');
+    
+    const startOfWeek = new Date(currentDate);
+    const day = startOfWeek.getDay() || 7; 
+    startOfWeek.setDate(startOfWeek.getDate() - day + 1); // Monday start
+    
+    const headers = document.getElementById('day-headers');
+    headers.innerHTML = '';
+    const grid = document.getElementById('time-grid');
+    grid.className = 'time-grid week-grid';
+    grid.innerHTML = ''; // Clear indicator from root
+    
+    for(let i=0; i<7; i++) {
+        const d = new Date(startOfWeek);
+        d.setDate(d.getDate() + i);
+        const dateStr = formatDate(d);
+        const isToday = dateStr === formatDate(new Date());
+        
+        headers.innerHTML += `<div class="day-header ${isToday ? 'active' : ''}">${d.toLocaleDateString('en-US', {weekday: 'short', day: 'numeric'})}</div>`;
+        
+        const col = document.createElement('div');
+        col.className = 'day-column';
+        if (isToday) {
+            col.innerHTML = '<div class="current-time-indicator" id="time-indicator"></div>';
+        }
+        
+        const dayEvents = appData.events.filter(e => e.date === dateStr);
+        renderEventsToContainer(dayEvents, col);
+        grid.appendChild(col);
+    }
+}
+
+function renderMonthView() {
+    document.getElementById('timeline-body').classList.add('hidden');
+    document.getElementById('timeline-header').classList.add('hidden');
+    const container = document.getElementById('month-view-container');
+    container.classList.remove('hidden');
+    
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    const firstDay = new Date(year, month, 1).getDay() || 7; // Mon=1, Sun=7
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    
+    let html = '<div class="month-view"><div class="month-header">';
+    ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].forEach(d => html += `<div>${d}</div>`);
+    html += '</div><div class="month-grid">';
+    
+    // Padding
+    for(let i=1; i<firstDay; i++) {
+        html += `<div class="month-day empty"></div>`;
+    }
+    
+    // Days
+    for(let i=1; i<=daysInMonth; i++) {
+        const d = new Date(year, month, i);
+        const dateStr = formatDate(d);
+        const isToday = dateStr === formatDate(new Date());
+        const dayEvents = appData.events.filter(e => e.date === dateStr);
+        
+        let eventsHtml = dayEvents.map(e => `
+            <div class="month-event" style="background-color: ${e.color.replace('var(', '').replace(')', '')}; border-left: 3px solid ${e.color.includes('var') ? `var(--cat-${e.category.toLowerCase()})` : e.color}" data-id="${e.id}">
+                ${e.start} ${e.title}
+            </div>
+        `).join('');
+        
+        html += `<div class="month-day ${isToday ? 'today' : ''}"><div class="month-day-number">${i}</div>${eventsHtml}</div>`;
+    }
+    html += '</div></div>';
+    container.innerHTML = html;
+
+    // Attach delete handlers for month events
+    container.querySelectorAll('.month-event').forEach(el => {
+        el.addEventListener('dblclick', (e) => {
+            e.stopPropagation();
+            if(confirm('Delete this event?')) {
+                const id = el.getAttribute('data-id');
+                appData.events = appData.events.filter(ev => ev.id !== id);
+                saveData();
+                renderCalendar();
+            }
+        });
     });
 }
 
-function renderEvents() {
-    const grid = document.getElementById('time-grid');
-    // Remove old events
-    document.querySelectorAll('.event-block').forEach(el => el.remove());
-
-    appData.events.forEach(ev => {
+function renderEventsToContainer(events, container) {
+    events.forEach(ev => {
         const [startH, startM] = ev.start.split(':').map(Number);
         const [endH, endM] = ev.end.split(':').map(Number);
         
@@ -93,7 +225,6 @@ function renderEvents() {
         block.className = 'event-block glass-panel';
         block.style.top = `${top}px`;
         block.style.height = `${duration}px`;
-        block.style.backgroundColor = ev.color.replace('var(', '').replace(')', ''); // Fallback
         block.style.background = `linear-gradient(135deg, rgba(20,20,20,0.8), rgba(20,20,20,0.9))`;
         block.style.borderLeftColor = ev.color.includes('var') ? `var(--cat-${ev.category.toLowerCase()})` : ev.color;
         
@@ -106,11 +237,38 @@ function renderEvents() {
             if(confirm('Delete this time block?')) {
                 appData.events = appData.events.filter(e => e.id !== ev.id);
                 saveData();
-                renderEvents();
+                renderCalendar();
             }
         });
         
-        grid.appendChild(block);
+        container.appendChild(block);
+    });
+}
+
+function startClock() {
+    if(clockInterval) clearInterval(clockInterval);
+    
+    function update() {
+        const indicator = document.getElementById('time-indicator');
+        if (indicator) {
+            const now = new Date();
+            const mins = (now.getHours() * 60) + now.getMinutes();
+            indicator.style.top = `${mins}px`;
+        }
+    }
+    
+    update();
+    clockInterval = setInterval(update, 60000);
+}
+
+function renderCategories() {
+    const list = document.getElementById('category-list');
+    list.innerHTML = '';
+    appData.categories.forEach(cat => {
+        const li = document.createElement('li');
+        li.className = 'category-item';
+        li.innerHTML = `<div class="cat-dot" style="background: ${cat.color}"></div> <span>${cat.name}</span>`;
+        list.appendChild(li);
     });
 }
 
@@ -156,41 +314,51 @@ function updateDashboardStats() {
     document.getElementById('focus-score').textContent = `${focusScore}%`;
 }
 
-function startClock() {
-    const indicator = document.getElementById('time-indicator');
-    const body = document.getElementById('timeline-body');
-    
-    function update() {
-        const now = new Date();
-        const mins = (now.getHours() * 60) + now.getMinutes();
-        indicator.style.top = `${mins}px`;
-    }
-    
-    update();
-    setInterval(update, 60000);
-    
-    // Scroll to current time initially
-    setTimeout(() => {
-        const now = new Date();
-        const scrollPos = (now.getHours() * 60) - 100;
-        body.scrollTop = scrollPos > 0 ? scrollPos : 0;
-    }, 100);
-}
-
-// Event Listeners
 function setupEventListeners() {
+    // View Navigation
+    const views = ['day', 'week', 'month'];
+    views.forEach(v => {
+        document.getElementById(`btn-view-${v}`).addEventListener('click', (e) => {
+            views.forEach(view => document.getElementById(`btn-view-${view}`).classList.remove('active'));
+            e.currentTarget.classList.add('active');
+            currentView = v;
+            renderCalendar();
+        });
+    });
+
+    // Date Navigation
+    document.getElementById('prev-date').addEventListener('click', () => {
+        if (currentView === 'day') currentDate.setDate(currentDate.getDate() - 1);
+        else if (currentView === 'week') currentDate.setDate(currentDate.getDate() - 7);
+        else if (currentView === 'month') currentDate.setMonth(currentDate.getMonth() - 1);
+        renderCalendar();
+    });
+
+    document.getElementById('next-date').addEventListener('click', () => {
+        if (currentView === 'day') currentDate.setDate(currentDate.getDate() + 1);
+        else if (currentView === 'week') currentDate.setDate(currentDate.getDate() + 7);
+        else if (currentView === 'month') currentDate.setMonth(currentDate.getMonth() + 1);
+        renderCalendar();
+    });
+
     // Modal
     const modal = document.getElementById('event-modal');
     const fab = document.getElementById('main-fab');
     const cancelBtn = document.getElementById('cancel-event');
     const form = document.getElementById('event-form');
+    const dateInput = document.getElementById('event-date');
 
-    fab.addEventListener('click', () => modal.classList.remove('hidden'));
+    fab.addEventListener('click', () => {
+        dateInput.value = formatDate(currentDate);
+        modal.classList.remove('hidden');
+    });
+    
     cancelBtn.addEventListener('click', () => modal.classList.add('hidden'));
 
     form.addEventListener('submit', (e) => {
         e.preventDefault();
         const title = document.getElementById('event-title').value;
+        const date = document.getElementById('event-date').value;
         const start = document.getElementById('event-start').value;
         const end = document.getElementById('event-end').value;
         const category = document.getElementById('event-category').value;
@@ -200,16 +368,16 @@ function setupEventListeners() {
 
         appData.events.push({
             id: Date.now().toString(),
-            title, start, end, category, color
+            title, date, start, end, category, color
         });
         
         saveData();
-        renderEvents();
+        renderCalendar();
         modal.classList.add('hidden');
         form.reset();
     });
 
-    // Tasks
+    // Tasks Quick Add
     const addTaskBtn = document.getElementById('add-task-btn');
     const taskInputContainer = document.getElementById('task-input-container');
     const taskInput = document.getElementById('new-task-input');
