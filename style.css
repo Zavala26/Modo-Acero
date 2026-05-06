@@ -150,7 +150,10 @@ button {
     padding: 1.5rem 2rem;
 }
 
-.date-display h1 { font-size: 2rem; font-weight: 700; margin-bottom: 0.2rem; }
+.date-display-header { display: flex; align-items: center; gap: 1rem; margin-bottom: 0.2rem; }
+.date-display-header h1 { font-size: 2rem; font-weight: 700; margin: 0; min-width: 180px; }
+.date-nav-btn { background: rgba(255,255,255,0.05); padding: 0.5rem 0.8rem; border-radius: 8px; font-size: 1rem; border: 1px solid var(--glass-border); }
+.date-nav-btn:hover { background: rgba(255,255,255,0.1); color: var(--accent-blue); box-shadow: var(--glow-blue); }
 .date-display p { color: var(--text-muted); }
 
 .dashboard-stats { display: flex; gap: 2rem; }
@@ -164,14 +167,16 @@ button {
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    position: relative;
 }
 .timeline-header {
     display: flex;
     border-bottom: 1px solid var(--glass-border);
 }
 .tz-label { width: 60px; text-align: center; padding: 1rem 0; color: var(--text-muted); font-size: 0.8rem; }
-.day-headers { flex: 1; display: flex; }
-.day-header { flex: 1; text-align: center; padding: 1rem 0; font-weight: 600; border-bottom: 2px solid var(--accent-blue); }
+.day-headers { flex: 1; display: grid; grid-auto-columns: 1fr; grid-auto-flow: column; }
+.day-header { text-align: center; padding: 1rem 0; font-weight: 600; border-bottom: 2px solid transparent; }
+.day-header.active { border-bottom: 2px solid var(--accent-blue); color: var(--accent-blue); text-shadow: var(--glow-blue); }
 
 .timeline-body {
     flex: 1;
@@ -203,6 +208,26 @@ button {
     background-size: 100% 60px;
 }
 
+/* Week Grid */
+.week-grid { display: grid; grid-template-columns: repeat(7, 1fr); }
+.day-column { position: relative; border-right: 1px solid var(--glass-border); height: 1440px; /* 24hr * 60px */ }
+.day-column:last-child { border-right: none; }
+
+/* Month View */
+#month-view-container { flex: 1; overflow: hidden; }
+.month-view { display: flex; flex-direction: column; height: 100%; padding: 1rem; }
+.month-header { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; font-weight: bold; padding-bottom: 1rem; color: var(--text-muted); text-transform: uppercase; font-size: 0.85rem; }
+.month-grid { display: grid; grid-template-columns: repeat(7, 1fr); grid-auto-rows: 1fr; flex: 1; gap: 6px; }
+.month-day { border: 1px solid var(--glass-border); border-radius: 8px; padding: 6px; display: flex; flex-direction: column; gap: 4px; overflow-y: auto; background: rgba(0,0,0,0.2); transition: all 0.2s; }
+.month-day:hover { background: rgba(255,255,255,0.03); }
+.month-day.empty { opacity: 0.2; pointer-events: none; border-color: transparent; }
+.month-day.today { border-color: var(--accent-blue); background: rgba(0, 245, 255, 0.05); }
+.month-day-number { font-size: 0.9rem; font-weight: 600; text-align: right; margin-bottom: 4px; opacity: 0.8; }
+.month-day.today .month-day-number { color: var(--accent-blue); text-shadow: var(--glow-blue); }
+.month-event { font-size: 0.7rem; padding: 4px 6px; border-radius: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; color: white; font-weight: 500; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+.month-day::-webkit-scrollbar { width: 4px; }
+.month-day::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 2px; }
+
 .current-time-indicator {
     position: absolute;
     left: 0;
@@ -224,20 +249,21 @@ button {
     background: var(--accent-purple);
 }
 
-/* Event Blocks */
+/* Event Blocks (Day/Week) */
 .event-block {
     position: absolute;
-    left: 10px;
-    right: 10px;
+    left: 4px;
+    right: 4px;
     border-radius: 6px;
-    padding: 4px 8px;
+    padding: 6px 8px;
     font-size: 0.8rem;
     overflow: hidden;
     cursor: pointer;
     transition: transform 0.2s;
     border-left: 4px solid rgba(255,255,255,0.5);
+    z-index: 5;
 }
-.event-block:hover { transform: scale(1.02); z-index: 5; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+.event-block:hover { transform: scale(1.02); z-index: 10; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
 .event-time { font-size: 0.7rem; opacity: 0.8; margin-bottom: 2px; }
 .event-title { font-weight: 600; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
 
@@ -311,6 +337,8 @@ button {
     background: rgba(0,0,0,0.3); border: 1px solid var(--glass-border);
     color: white; outline: none; margin-bottom: 1rem;
 }
+.modal input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); cursor: pointer; }
+.modal input[type="time"]::-webkit-calendar-picker-indicator { filter: invert(1); cursor: pointer; }
 .modal input:focus, .modal select:focus, .modal textarea:focus { border-color: var(--accent-purple); }
 .time-inputs { display: flex; gap: 1rem; align-items: center; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 1rem; margin-top: 1rem; }
