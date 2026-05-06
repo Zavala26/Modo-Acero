@@ -18,9 +18,9 @@
             </div>
             
             <nav class="main-nav">
-                <button class="nav-item active"><i class="fas fa-calendar-day"></i> Day</button>
-                <button class="nav-item"><i class="fas fa-calendar-week"></i> Week</button>
-                <button class="nav-item"><i class="fas fa-calendar-alt"></i> Month</button>
+                <button class="nav-item active" id="btn-view-day"><i class="fas fa-calendar-day"></i> Day</button>
+                <button class="nav-item" id="btn-view-week"><i class="fas fa-calendar-week"></i> Week</button>
+                <button class="nav-item" id="btn-view-month"><i class="fas fa-calendar-alt"></i> Month</button>
                 <button class="nav-item"><i class="fas fa-chart-line"></i> Stats</button>
             </nav>
 
@@ -40,7 +40,11 @@
         <main class="main-content">
             <header class="top-header glass-panel">
                 <div class="date-display">
-                    <h1 id="current-date-title">Today</h1>
+                    <div class="date-display-header">
+                        <button class="date-nav-btn" id="prev-date"><i class="fas fa-chevron-left"></i></button>
+                        <h1 id="current-date-title">Today</h1>
+                        <button class="date-nav-btn" id="next-date"><i class="fas fa-chevron-right"></i></button>
+                    </div>
                     <p id="current-date-subtitle">...</p>
                 </div>
                 <div class="dashboard-stats">
@@ -56,18 +60,25 @@
             </header>
 
             <div class="calendar-container glass-panel">
-                <div class="timeline-header">
+                <!-- Day / Week Header -->
+                <div class="timeline-header" id="timeline-header">
                     <span class="tz-label">CST</span>
-                    <div class="day-headers">
+                    <div class="day-headers" id="day-headers">
                         <div class="day-header active">Today</div>
                     </div>
                 </div>
+                
+                <!-- Day / Week Timeline -->
                 <div class="timeline-body" id="timeline-body">
                     <div class="time-labels" id="time-labels"></div>
                     <div class="time-grid" id="time-grid">
-                        <div class="current-time-indicator" id="time-indicator"></div>
-                        <!-- Events injected here -->
+                        <!-- Events and time indicator injected here -->
                     </div>
+                </div>
+
+                <!-- Month View (Hidden by default) -->
+                <div id="month-view-container" class="hidden">
+                    <!-- Month grid injected here -->
                 </div>
             </div>
         </main>
@@ -120,6 +131,7 @@
                 <h2>New Time Block</h2>
                 <form id="event-form">
                     <input type="text" id="event-title" placeholder="Event Title" required>
+                    <input type="date" id="event-date" required>
                     <div class="time-inputs">
                         <input type="time" id="event-start" required>
                         <span>to</span>
