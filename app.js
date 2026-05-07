@@ -1,13 +1,9 @@
-/* app.js */
 const state = {
-    view: 'day', 
+    view: 'day',
     currentDate: new Date(),
     events: JSON.parse(localStorage.getItem('nexus_events')) || [],
     tasks: JSON.parse(localStorage.getItem('nexus_tasks')) || [],
-    categories: {
-        Work: '#3b82f6', Health: '#10b981', Spiritual: '#8b5cf6',
-        Marriage: '#f43f5e', Business: '#f59e0b', Learning: '#06b6d4'
-    }
+    categories: { Work: '#3b82f6', Health: '#10b981', Spiritual: '#8b5cf6', Marriage: '#f43f5e' }
 };
 
 const UI = {
@@ -21,32 +17,20 @@ const UI = {
     eventForm: document.getElementById('event-form')
 };
 
-// Initialization
 function init() {
     setupEventListeners();
     render();
-    startTimeLine();
-    updateStats();
 }
 
 function save() {
     localStorage.setItem('nexus_events', JSON.stringify(state.events));
     localStorage.setItem('nexus_tasks', JSON.stringify(state.tasks));
-    updateStats();
 }
 
-// Rendering Logic
 function render() {
     const d = state.currentDate;
-    
-    // Header logic
-    if(state.view === 'month') {
-        UI.title.innerText = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-        UI.subtitle.innerText = d.getFullYear();
-    } else {
-        UI.title.innerText = d.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
-        UI.subtitle.innerText = d.toLocaleDateString('en-US', { weekday: 'long' });
-    }
+    UI.title.innerText = d.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+    UI.subtitle.innerText = d.toLocaleDateString('en-US', { weekday: 'long' });
 
     if (state.view === 'month') {
         document.getElementById('timeline-view').classList.add('hidden');
@@ -62,142 +46,83 @@ function render() {
 
 function renderTimeline() {
     UI.dayHeader.innerHTML = '';
-    UI.grid.innerHTML = '<div id="current-time-line" class="time-now-line"></div>';
-    
-    // Labels
-    const labels = document.getElementById('time-labels');
-    labels.innerHTML = '';
+    UI.grid.innerHTML = '';
+    document.getElementById('time-labels').innerHTML = '';
+
     for(let i=0; i<24; i++) {
         const div = document.createElement('div');
         div.className = 'hour-marker';
         div.innerText = `${String(i).padStart(2, '0')}:00`;
-        labels.appendChild(div);
+        document.getElementById('time-labels').appendChild(div);
     }
 
     const daysCount = state.view === 'day' ? 1 : 7;
     const start = new Date(state.currentDate);
-    if (state.view === 'week') {
-        // Monday Start
-        const day = start.getDay();
-        const diff = start.getDate() - day + (day === 0 ? -6 : 1);
-        start.setDate(diff);
-    }
+    if (state.view === 'week') start.setDate(start.getDate() - start.getDay() + 1);
 
     for (let i = 0; i < daysCount; i++) {
         const curr = new Date(start);
         curr.setDate(start.getDate() + i);
-        
         const col = document.createElement('div');
         col.className = 'day-column';
         const dateKey = curr.toISOString().split('T')[0];
-        
-        // Header Label
+
         const hLabel = document.createElement('div');
         hLabel.className = 'day-label';
-        if (curr.toDateString() === new Date().toDateString()) hLabel.classList.add('neon-blue');
         hLabel.innerText = curr.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' });
         UI.dayHeader.appendChild(hLabel);
 
-        // Events positioning
         state.events.filter(e => e.date === dateKey).forEach(ev => {
-            col.appendChild(createEventElement(ev));
+            const [h1, m1] = ev.start.split(':').map(Number);
+            const [h2, m2] = ev.end.split(':').map(Number);
+            const top = (h1 * 60 + m1) / 60 * 80;
+            const height = ((h2 * 60 + m2) - (h1 * 60 + m1)) / 60 * 80;
+            const el = document.createElement('div');
+            el.className = 'event-block';
+            el.style.top = `${top}px`;
+            el.style.height = `${Math.max(height, 25)}px`;
+            el.style.borderLeftColor = state.categories[ev.category];
+            el.innerHTML = `<b>${ev.title}</b><br>${ev.start}`;
+            el.onclick = () => openModal(ev);
+            col.appendChild(el);
         });
-
         UI.grid.appendChild(col);
     }
-    updateTimeLine();
-}
-
-function createEventElement(ev) {
-    const [h1, m1] = ev.start.split(':').map(Number);
-    const [h2, m2] = ev.end.split(':').map(Number);
-    const startMins = h1 * 60 + m1;
-    const duration = (h2 * 60 + m2) - startMins;
-    
-    // Hour height is 80px
-    const top = (startMins / 60) * 80;
-    const height = (duration / 60) * 80;
-
-    const el = document.createElement('div');
-    el.className = 'event-block';
-    el.style.top = `${top}px`;
-    el.style.height = `${Math.max(height, 25)}px`;
-    el.style.borderLeftColor = state.categories[ev.category];
-    el.innerHTML = `
-        <div class="event-title">${ev.title}</div>
-        <div class="event-time">${ev.start} - ${ev.end}</div>
-    `;
-    el.onclick = (e) => { e.stopPropagation(); openModal(ev); };
-    return el;
 }
 
 function renderMonth() {
     UI.monthGrid.innerHTML = '';
     const d = state.currentDate;
-    const firstDayOfMonth = new Date(d.getFullYear(), d.getMonth(), 1);
-    const lastDayOfMonth = new Date(d.getFullYear(), d.getMonth() + 1, 0);
-    
-    // Monday adjustment
-    let startDay = firstDayOfMonth.getDay(); 
-    if (startDay === 0) startDay = 7; 
-    
-    // Previous Month padding
-    const prevLast = new Date(d.getFullYear(), d.getMonth(), 0).getDate();
-    for (let i = startDay - 1; i > 0; i--) {
-        const cell = document.createElement('div');
-        cell.className = 'month-day other-month';
-        cell.innerHTML = `<span class="day-num">${prevLast - i + 1}</span>`;
-        UI.monthGrid.appendChild(cell);
-    }
-
-    // Days
-    for (let i = 1; i <= lastDayOfMonth.getDate(); i++) {
+    const last = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+    for (let i = 1; i <= last; i++) {
         const cell = document.createElement('div');
         cell.className = 'month-day';
         const curr = new Date(d.getFullYear(), d.getMonth(), i);
-        const dateKey = curr.toISOString().split('T')[0];
-        
-        if (curr.toDateString() === new Date().toDateString()) cell.style.borderColor = 'var(--accent-blue)';
+        const key = curr.toISOString().split('T')[0];
         cell.innerHTML = `<span class="day-num">${i}</span>`;
-        
-        state.events.filter(e => e.date === dateKey).forEach(ev => {
+        state.events.filter(e => e.date === key).forEach(ev => {
             const pill = document.createElement('div');
             pill.className = 'month-event-pill';
             pill.style.borderLeftColor = state.categories[ev.category];
             pill.innerText = ev.title;
-            pill.onclick = (e) => { e.stopPropagation(); openModal(ev); };
             cell.appendChild(pill);
         });
-
         UI.monthGrid.appendChild(cell);
     }
 }
 
-// Navigation
-function navigate(direction) {
-    if (state.view === 'day') state.currentDate.setDate(state.currentDate.getDate() + direction);
-    else if (state.view === 'week') state.currentDate.setDate(state.currentDate.getDate() + (direction * 7));
-    else if (state.view === 'month') state.currentDate.setMonth(state.currentDate.getMonth() + direction);
-    render();
-}
-
-// Modal & Forms
 function openModal(ev = null) {
     UI.modal.classList.remove('hidden');
     const delBtn = document.getElementById('delete-event');
-    
     if (ev) {
-        document.getElementById('modal-title').innerText = "Edit Event";
         document.getElementById('event-id').value = ev.id;
         document.getElementById('event-name').value = ev.title;
         document.getElementById('event-date').value = ev.date;
         document.getElementById('event-start').value = ev.start;
         document.getElementById('event-end').value = ev.end;
         document.getElementById('event-category').value = ev.category;
-        document.getElementById('event-notes').value = ev.notes || '';
         delBtn.classList.remove('hidden');
     } else {
-        document.getElementById('modal-title').innerText = "New Event";
         UI.eventForm.reset();
         document.getElementById('event-id').value = '';
         document.getElementById('event-date').value = state.currentDate.toISOString().split('T')[0];
@@ -206,7 +131,6 @@ function openModal(ev = null) {
 }
 
 function setupEventListeners() {
-    // View Switching
     document.querySelectorAll('.nav-item').forEach(btn => {
         btn.onclick = () => {
             document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
@@ -216,11 +140,19 @@ function setupEventListeners() {
         };
     });
 
-    document.getElementById('prev-date').onclick = () => navigate(-1);
-    document.getElementById('next-date').onclick = () => navigate(1);
+    document.getElementById('prev-date').onclick = () => {
+        state.currentDate.setDate(state.currentDate.getDate() - (state.view === 'week' ? 7 : 1));
+        render();
+    };
+
+    document.getElementById('next-date').onclick = () => {
+        state.currentDate.setDate(state.currentDate.getDate() + (state.view === 'week' ? 7 : 1));
+        render();
+    };
+
     document.getElementById('main-fab').onclick = () => openModal();
     document.getElementById('cancel-event').onclick = () => UI.modal.classList.add('hidden');
-
+    
     UI.eventForm.onsubmit = (e) => {
         e.preventDefault();
         const id = document.getElementById('event-id').value;
@@ -230,31 +162,21 @@ function setupEventListeners() {
             date: document.getElementById('event-date').value,
             start: document.getElementById('event-start').value,
             end: document.getElementById('event-end').value,
-            category: document.getElementById('event-category').value,
-            notes: document.getElementById('event-notes').value
+            category: document.getElementById('event-category').value
         };
-
         if (id) {
             const idx = state.events.findIndex(x => x.id === id);
             state.events[idx] = newEv;
-        } else {
-            state.events.push(newEv);
-        }
-        
-        save();
-        UI.modal.classList.add('hidden');
-        render();
+        } else state.events.push(newEv);
+        save(); UI.modal.classList.add('hidden'); render();
     };
 
     document.getElementById('delete-event').onclick = () => {
         const id = document.getElementById('event-id').value;
         state.events = state.events.filter(x => x.id !== id);
-        save();
-        UI.modal.classList.add('hidden');
-        render();
+        save(); UI.modal.classList.add('hidden'); render();
     };
 
-    // Task Functionality
     document.getElementById('add-task-btn').onclick = () => {
         document.getElementById('task-input-container').classList.toggle('hidden');
         document.getElementById('new-task-input').focus();
@@ -263,9 +185,7 @@ function setupEventListeners() {
     document.getElementById('new-task-input').onkeydown = (e) => {
         if(e.key === 'Enter' && e.target.value) {
             state.tasks.push({ id: Date.now(), text: e.target.value, done: false });
-            e.target.value = '';
-            save();
-            renderTasks();
+            e.target.value = ''; save(); renderTasks();
         }
     };
 }
@@ -275,63 +195,10 @@ function renderTasks() {
     state.tasks.forEach(t => {
         const li = document.createElement('li');
         li.className = `task-item ${t.done ? 'done' : ''}`;
-        li.innerHTML = `<div class="check-circle"></div> <span>${t.text}</span>`;
+        li.innerHTML = `<div class="check-circle"></div><span>${t.text}</span>`;
         li.onclick = () => { t.done = !t.done; save(); renderTasks(); };
         UI.taskList.appendChild(li);
     });
 }
-
-function updateStats() {
-    const total = state.tasks.length;
-    const done = state.tasks.filter(x => x.done).length;
-    document.getElementById('tasks-stat').innerText = `${done}/${total}`;
-    document.getElementById('focus-score').innerText = total ? `${Math.round((done/total)*100)}%` : '0%';
-}
-
-function updateTimeLine() {
-    const line = document.getElementById('current-time-line');
-    if (!line) return;
-    const now = new Date();
-    const mins = now.getHours() * 60 + now.getMinutes();
-    line.style.top = `${(mins / 60) * 80}px`;
-}
-
-function startTimeLine() {
-    updateTimeLine();
-    setInterval(updateTimeLine, 60000);
-}
-
-// Pomodoro Timer Logic
-let pomoTime = 1500;
-let pomoInterval = null;
-const pomoDisplay = document.getElementById('pomo-timer');
-
-document.getElementById('pomo-start').onclick = () => {
-    if (pomoInterval) {
-        clearInterval(pomoInterval);
-        pomoInterval = null;
-        document.getElementById('pomo-start').innerHTML = '<i class="fas fa-play"></i>';
-    } else {
-        pomoInterval = setInterval(() => {
-            pomoTime--;
-            const m = Math.floor(pomoTime / 60);
-            const s = pomoTime % 60;
-            pomoDisplay.innerText = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-            if (pomoTime <= 0) {
-                clearInterval(pomoInterval);
-                alert("Focus Session Complete!");
-            }
-        }, 1000);
-        document.getElementById('pomo-start').innerHTML = '<i class="fas fa-pause"></i>';
-    }
-};
-
-document.getElementById('pomo-reset').onclick = () => {
-    clearInterval(pomoInterval);
-    pomoInterval = null;
-    pomoTime = 1500;
-    pomoDisplay.innerText = "25:00";
-    document.getElementById('pomo-start').innerHTML = '<i class="fas fa-play"></i>';
-};
 
 init();
