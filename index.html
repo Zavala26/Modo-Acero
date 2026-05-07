@@ -1,16 +1,14 @@
-<!-- index.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OS | Personal Life Management</title>
+    <title>Nexus OS | Personal Operating System</title>
     <link rel="stylesheet" href="style.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 </head>
 <body>
     <div class="app-container">
-        <!-- Sidebar -->
         <aside class="sidebar glass-panel">
             <div class="brand">
                 <i class="fas fa-layer-group neon-blue"></i>
@@ -18,78 +16,70 @@
             </div>
             
             <nav class="main-nav">
-                <button class="nav-item active" id="btn-view-day"><i class="fas fa-calendar-day"></i> Day</button>
-                <button class="nav-item" id="btn-view-week"><i class="fas fa-calendar-week"></i> Week</button>
-                <button class="nav-item" id="btn-view-month"><i class="fas fa-calendar-alt"></i> Month</button>
-                <button class="nav-item"><i class="fas fa-chart-line"></i> Stats</button>
+                <button class="nav-item active" data-view="day"><i class="fas fa-calendar-day"></i> <span>Day</span></button>
+                <button class="nav-item" data-view="week"><i class="fas fa-calendar-week"></i> <span>Week</span></button>
+                <button class="nav-item" data-view="month"><i class="fas fa-calendar-alt"></i> <span>Month</span></button>
+                <button class="nav-item"><i class="fas fa-chart-line"></i> <span>Stats</span></button>
             </nav>
 
             <div class="categories-section">
                 <h3>Life Categories</h3>
-                <ul id="category-list" class="category-list">
-                    <!-- Populated by JS -->
-                </ul>
+                <ul id="category-list" class="category-list"></ul>
             </div>
             
             <div class="bottom-actions">
-                <button class="settings-btn"><i class="fas fa-cog"></i> Settings</button>
+                <button class="settings-btn"><i class="fas fa-cog"></i> <span>Settings</span></button>
             </div>
         </aside>
 
-        <!-- Main Content -->
         <main class="main-content">
             <header class="top-header glass-panel">
-                <div class="date-display">
-                    <div class="date-display-header">
-                        <button class="date-nav-btn" id="prev-date"><i class="fas fa-chevron-left"></i></button>
+                <div class="date-controls">
+                    <button id="prev-date" class="nav-arrow"><i class="fas fa-chevron-left"></i></button>
+                    <div class="date-display">
                         <h1 id="current-date-title">Today</h1>
-                        <button class="date-nav-btn" id="next-date"><i class="fas fa-chevron-right"></i></button>
+                        <p id="current-date-subtitle">...</p>
                     </div>
-                    <p id="current-date-subtitle">...</p>
+                    <button id="next-date" class="nav-arrow"><i class="fas fa-chevron-right"></i></button>
                 </div>
                 <div class="dashboard-stats">
                     <div class="stat-card">
                         <span class="stat-label">Focus Score</span>
-                        <span class="stat-value neon-purple" id="focus-score">85%</span>
+                        <span class="stat-value neon-purple" id="focus-score">0%</span>
                     </div>
                     <div class="stat-card">
-                        <span class="stat-label">Tasks Done</span>
+                        <span class="stat-label">Progress</span>
                         <span class="stat-value neon-blue" id="tasks-stat">0/0</span>
                     </div>
                 </div>
             </header>
 
             <div class="calendar-container glass-panel">
-                <!-- Day / Week Header -->
-                <div class="timeline-header" id="timeline-header">
-                    <span class="tz-label">CST</span>
-                    <div class="day-headers" id="day-headers">
-                        <div class="day-header active">Today</div>
+                <div id="timeline-view" class="calendar-view">
+                    <div class="timeline-header">
+                        <div class="time-col-spacer"></div>
+                        <div class="day-columns-header" id="day-columns-header"></div>
                     </div>
-                </div>
-                
-                <!-- Day / Week Timeline -->
-                <div class="timeline-body" id="timeline-body">
-                    <div class="time-labels" id="time-labels"></div>
-                    <div class="time-grid" id="time-grid">
-                        <!-- Events and time indicator injected here -->
+                    <div class="timeline-scroll-area">
+                        <div class="time-labels-column" id="time-labels"></div>
+                        <div class="grid-content" id="calendar-grid">
+                            <div id="current-time-line" class="time-now-line"></div>
+                            </div>
                     </div>
                 </div>
 
-                <!-- Month View (Hidden by default) -->
-                <div id="month-view-container" class="hidden">
-                    <!-- Month grid injected here -->
+                <div id="month-view" class="calendar-view hidden">
+                    <div class="month-grid-header">
+                        <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+                    </div>
+                    <div class="month-grid-body" id="month-grid-body"></div>
                 </div>
             </div>
         </main>
 
-        <!-- Right Panel (Productivity) -->
         <aside class="right-panel">
-            <!-- Pomodoro -->
             <div class="pomodoro-widget glass-panel">
-                <div class="pomo-header">
-                    <h3><i class="fas fa-stopwatch"></i> Focus Mode</h3>
-                </div>
+                <div class="pomo-header"><h3><i class="fas fa-stopwatch"></i> Focus</h3></div>
                 <div class="pomo-display neon-blue" id="pomo-timer">25:00</div>
                 <div class="pomo-controls">
                     <button id="pomo-start"><i class="fas fa-play"></i></button>
@@ -97,59 +87,47 @@
                 </div>
             </div>
 
-            <!-- Tasks -->
             <div class="tasks-widget glass-panel">
                 <div class="widget-header">
-                    <h3><i class="fas fa-check-square"></i> Action Items</h3>
+                    <h3><i class="fas fa-check-square"></i> Tasks</h3>
                     <button id="add-task-btn" class="icon-btn"><i class="fas fa-plus"></i></button>
                 </div>
-                <div class="task-input-container hidden" id="task-input-container">
-                    <input type="text" id="new-task-input" placeholder="Type and press Enter...">
+                <div id="task-input-container" class="task-input-container hidden">
+                    <input type="text" id="new-task-input" placeholder="New task...">
                 </div>
-                <ul class="task-list" id="task-list">
-                    <!-- Tasks injected here -->
-                </ul>
-            </div>
-
-            <!-- Habits -->
-            <div class="habits-widget glass-panel">
-                <div class="widget-header">
-                    <h3><i class="fas fa-leaf"></i> Daily Habits</h3>
-                </div>
-                <ul class="habit-list" id="habit-list">
-                    <!-- Habits injected here -->
-                </ul>
+                <ul class="task-list" id="task-list"></ul>
             </div>
         </aside>
 
-        <!-- Floating Action Button -->
         <button class="fab" id="main-fab"><i class="fas fa-plus"></i></button>
 
-        <!-- Event Modal -->
         <div class="modal-overlay hidden" id="event-modal">
             <div class="modal glass-panel">
-                <h2>New Time Block</h2>
+                <h2 id="modal-title">New Event</h2>
                 <form id="event-form">
-                    <input type="text" id="event-title" placeholder="Event Title" required>
-                    <input type="date" id="event-date" required>
+                    <input type="hidden" id="event-id">
+                    <input type="text" id="event-name" placeholder="Event Title" required>
+                    <div class="input-group">
+                        <input type="date" id="event-date" required>
+                    </div>
                     <div class="time-inputs">
                         <input type="time" id="event-start" required>
                         <span>to</span>
                         <input type="time" id="event-end" required>
                     </div>
                     <select id="event-category">
-                        <option value="Health">Health</option>
-                        <option value="Marriage">Marriage</option>
-                        <option value="Spiritual">Spiritual</option>
                         <option value="Work">Work</option>
+                        <option value="Health">Health</option>
+                        <option value="Spiritual">Spiritual</option>
+                        <option value="Marriage">Marriage</option>
                         <option value="Business">Business</option>
                         <option value="Learning">Learning</option>
-                        <option value="Family">Family</option>
                     </select>
                     <textarea id="event-notes" placeholder="Notes..."></textarea>
                     <div class="modal-actions">
+                        <button type="button" id="delete-event" class="btn-danger hidden">Delete</button>
                         <button type="button" id="cancel-event" class="btn-secondary">Cancel</button>
-                        <button type="submit" class="btn-primary">Save Block</button>
+                        <button type="submit" class="btn-primary">Save</button>
                     </div>
                 </form>
             </div>
