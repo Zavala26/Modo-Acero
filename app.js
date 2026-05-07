@@ -1,448 +1,320 @@
 /* app.js */
-const STORAGE_KEY = 'nexusOS_data';
-
-// Utilities
-function formatDate(d) {
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-
-const today = new Date();
-let currentDate = new Date();
-let currentView = 'day'; // 'day', 'week', 'month'
-
-// Generate Dynamic Default Data so events show up today
-const defaultData = {
-    events: [
-        { id: '1', title: 'Deep Work', date: formatDate(today), start: '09:00', end: '11:30', category: 'Work', color: 'var(--cat-work)' },
-        { id: '2', title: 'Calisthenics', date: formatDate(today), start: '12:00', end: '13:00', category: 'Health', color: 'var(--cat-health)' },
-        { id: '3', title: 'Digital Privacy Project', date: formatDate(today), start: '14:00', end: '16:00', category: 'Learning', color: 'var(--cat-learning)' },
-        { id: '4', title: 'Time with Wife', date: formatDate(today), start: '18:00', end: '20:00', category: 'Marriage', color: 'var(--cat-marriage)' }
-    ],
-    tasks: [
-        { id: 't1', text: 'Review PRs', completed: false },
-        { id: 't2', text: 'Workout', completed: true },
-        { id: 't3', text: 'Read 10 pages', completed: false }
-    ],
-    categories: [
-        { name: 'Health', color: 'var(--cat-health)' },
-        { name: 'Marriage', color: 'var(--cat-marriage)' },
-        { name: 'Spiritual', color: 'var(--cat-spiritual)' },
-        { name: 'Work', color: 'var(--cat-work)' },
-        { name: 'Business', color: 'var(--cat-business)' },
-        { name: 'Learning', color: 'var(--cat-learning)' },
-        { name: 'Family', color: 'var(--cat-family)' }
-    ],
-    habits: [
-        { name: 'Meditation', streak: 12 },
-        { name: 'Cold Shower', streak: 5 },
-        { name: 'Journaling', streak: 21 }
-    ]
+const state = {
+    view: 'day', // day, week, month
+    currentDate: new Date(),
+    events: JSON.parse(localStorage.getItem('nexus_events')) || [],
+    tasks: JSON.parse(localStorage.getItem('nexus_tasks')) || [],
+    categories: {
+        Work: '#3b82f6', Health: '#10b981', Spiritual: '#8b5cf6',
+        Marriage: '#f43f5e', Business: '#f59e0b', Learning: '#06b6d4'
+    }
 };
 
-let appData = JSON.parse(localStorage.getItem(STORAGE_KEY)) || defaultData;
-let clockInterval;
+const UI = {
+    title: document.getElementById('current-date-title'),
+    subtitle: document.getElementById('current-date-subtitle'),
+    grid: document.getElementById('calendar-grid'),
+    dayHeader: document.getElementById('day-columns-header'),
+    monthGrid: document.getElementById('month-grid-body'),
+    taskList: document.getElementById('task-list'),
+    modal: document.getElementById('event-modal'),
+    eventForm: document.getElementById('event-form')
+};
 
-function saveData() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
-    updateDashboardStats();
-}
-
-// Initialization
-document.addEventListener('DOMContentLoaded', () => {
-    initTimelineLabels();
-    renderCategories();
-    renderTasks();
-    renderHabits();
-    updateDashboardStats();
+// --- Initialization ---
+function init() {
     setupEventListeners();
-    renderCalendar();
-    
-    // Initial scroll to current time in timeline
-    setTimeout(() => {
-        const scrollPos = (today.getHours() * 60) - 100;
-        document.getElementById('timeline-body').scrollTop = scrollPos > 0 ? scrollPos : 0;
-    }, 100);
-});
+    render();
+    startTimeLine();
+    updateStats();
+}
 
-function initTimelineLabels() {
-    const labelsContainer = document.getElementById('time-labels');
-    labelsContainer.innerHTML = '';
-    for (let i = 0; i < 24; i++) {
+function save() {
+    localStorage.setItem('nexus_events', JSON.stringify(state.events));
+    localStorage.setItem('nexus_tasks', JSON.stringify(state.tasks));
+    updateStats();
+}
+
+// --- Navigation ---
+function navigate(direction) {
+    const d = state.currentDate;
+    if (state.view === 'day') d.setDate(d.getDate() + direction);
+    else if (state.view === 'week') d.setDate(d.getDate() + (direction * 7));
+    else if (state.view === 'month') d.setMonth(d.getMonth() + direction);
+    render();
+}
+
+// --- Core Rendering ---
+function render() {
+    const d = state.currentDate;
+    UI.title.innerText = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    UI.subtitle.innerText = d.toLocaleDateString('en-US', { weekday: 'long', day: 'numeric' });
+
+    if (state.view === 'month') {
+        document.getElementById('timeline-view').classList.add('hidden');
+        document.getElementById('month-view').classList.remove('hidden');
+        renderMonth();
+    } else {
+        document.getElementById('timeline-view').classList.remove('hidden');
+        document.getElementById('month-view').classList.add('hidden');
+        renderTimeline();
+    }
+    renderTasks();
+}
+
+function renderTimeline() {
+    UI.dayHeader.innerHTML = '';
+    UI.grid.innerHTML = '<div id="current-time-line" class="time-now-line"></div>';
+    
+    const labels = document.getElementById('time-labels');
+    labels.innerHTML = '';
+    for(let i=0; i<24; i++) {
         const div = document.createElement('div');
-        div.className = 'time-label';
-        div.textContent = `${i.toString().padStart(2, '0')}:00`;
-        labelsContainer.appendChild(div);
+        div.className = 'hour-marker';
+        div.innerText = `${String(i).padStart(2, '0')}:00`;
+        labels.appendChild(div);
     }
-}
 
-// Calendar Rendering Logic
-function renderCalendar() {
-    updateHeaderDate();
-    if (currentView === 'day') renderDayView();
-    else if (currentView === 'week') renderWeekView();
-    else if (currentView === 'month') renderMonthView();
-    
-    startClock();
-}
-
-function updateHeaderDate() {
-    const title = document.getElementById('current-date-title');
-    const subtitle = document.getElementById('current-date-subtitle');
-    
-    if (currentView === 'day') {
-        const isToday = formatDate(currentDate) === formatDate(new Date());
-        title.textContent = isToday ? "Today" : currentDate.toLocaleDateString('en-US', {weekday: 'long'});
-        subtitle.textContent = currentDate.toLocaleDateString('en-US', {month: 'long', day: 'numeric', year: 'numeric'});
-    } else if (currentView === 'week') {
-        title.textContent = "This Week";
-        const start = new Date(currentDate);
-        const day = start.getDay() || 7;
-        start.setDate(start.getDate() - day + 1);
-        const end = new Date(start);
-        end.setDate(end.getDate() + 6);
-        subtitle.textContent = `${start.toLocaleDateString('en-US', {month: 'short', day: 'numeric'})} - ${end.toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: 'numeric'})}`;
-    } else if (currentView === 'month') {
-        title.textContent = currentDate.toLocaleDateString('en-US', {month: 'long'});
-        subtitle.textContent = currentDate.getFullYear();
+    const daysCount = state.view === 'day' ? 1 : 7;
+    const start = new Date(state.currentDate);
+    if (state.view === 'week') {
+        const day = start.getDay();
+        const diff = start.getDate() - day + (day === 0 ? -6 : 1);
+        start.setDate(diff);
     }
-}
 
-function renderDayView() {
-    document.getElementById('month-view-container').classList.add('hidden');
-    document.getElementById('timeline-body').classList.remove('hidden');
-    document.getElementById('timeline-header').classList.remove('hidden');
-    
-    // Headers
-    const headers = document.getElementById('day-headers');
-    const isToday = formatDate(currentDate) === formatDate(new Date());
-    headers.innerHTML = `<div class="day-header ${isToday ? 'active' : ''}">${currentDate.toLocaleDateString('en-US', {weekday: 'long', month: 'short', day: 'numeric'})}</div>`;
-    
-    // Grid
-    const grid = document.getElementById('time-grid');
-    grid.className = 'time-grid';
-    grid.innerHTML = isToday ? '<div class="current-time-indicator" id="time-indicator"></div>' : '';
-    
-    const dayEvents = appData.events.filter(e => e.date === formatDate(currentDate));
-    renderEventsToContainer(dayEvents, grid);
-}
-
-function renderWeekView() {
-    document.getElementById('month-view-container').classList.add('hidden');
-    document.getElementById('timeline-body').classList.remove('hidden');
-    document.getElementById('timeline-header').classList.remove('hidden');
-    
-    const startOfWeek = new Date(currentDate);
-    const day = startOfWeek.getDay() || 7; 
-    startOfWeek.setDate(startOfWeek.getDate() - day + 1); // Monday start
-    
-    const headers = document.getElementById('day-headers');
-    headers.innerHTML = '';
-    const grid = document.getElementById('time-grid');
-    grid.className = 'time-grid week-grid';
-    grid.innerHTML = ''; // Clear indicator from root
-    
-    for(let i=0; i<7; i++) {
-        const d = new Date(startOfWeek);
-        d.setDate(d.getDate() + i);
-        const dateStr = formatDate(d);
-        const isToday = dateStr === formatDate(new Date());
-        
-        headers.innerHTML += `<div class="day-header ${isToday ? 'active' : ''}">${d.toLocaleDateString('en-US', {weekday: 'short', day: 'numeric'})}</div>`;
+    for (let i = 0; i < daysCount; i++) {
+        const curr = new Date(start);
+        curr.setDate(start.getDate() + i);
         
         const col = document.createElement('div');
         col.className = 'day-column';
-        if (isToday) {
-            col.innerHTML = '<div class="current-time-indicator" id="time-indicator"></div>';
+        const dateStr = curr.toDateString();
+        
+        // Header
+        const hLabel = document.createElement('div');
+        hLabel.className = 'day-label';
+        if (curr.toDateString() === new Date().toDateString()) hLabel.classList.add('neon-blue');
+        hLabel.innerText = curr.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' });
+        UI.dayHeader.appendChild(hLabel);
+
+        // Events
+        state.events.filter(e => new Date(e.date).toDateString() === dateStr).forEach(ev => {
+            col.appendChild(createEventElement(ev));
+        });
+
+        UI.grid.appendChild(col);
+    }
+    updateTimeLine();
+}
+
+function createEventElement(ev) {
+    const [h1, m1] = ev.start.split(':').map(Number);
+    const [h2, m2] = ev.end.split(':').map(Number);
+    const startMins = h1 * 60 + m1;
+    const endMins = h2 * 60 + m2;
+    const duration = endMins - startMins;
+
+    const el = document.createElement('div');
+    el.className = 'event-block';
+    el.style.top = `${(startMins / 60) * 80}px`;
+    el.style.height = `${(duration / 60) * 80}px`;
+    el.style.borderLeftColor = state.categories[ev.category];
+    el.innerHTML = `
+        <div class="event-title">${ev.title}</div>
+        <div class="event-time">${ev.start} - ${ev.end}</div>
+    `;
+    el.onclick = (e) => { e.stopPropagation(); openModal(ev); };
+    return el;
+}
+
+function renderMonth() {
+    UI.monthGrid.innerHTML = '';
+    const d = state.currentDate;
+    const firstDay = new Date(d.getFullYear(), d.getMonth(), 1);
+    const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+    
+    let startDay = firstDay.getDay(); 
+    if (startDay === 0) startDay = 7;
+    
+    // Previous Month padding
+    const prevLast = new Date(d.getFullYear(), d.getMonth(), 0).getDate();
+    for (let i = startDay - 1; i > 0; i--) {
+        const cell = document.createElement('div');
+        cell.className = 'month-day other-month';
+        cell.innerHTML = `<span class="day-num">${prevLast - i + 1}</span>`;
+        UI.monthGrid.appendChild(cell);
+    }
+
+    // Current Month
+    for (let i = 1; i <= lastDay.getDate(); i++) {
+        const cell = document.createElement('div');
+        cell.className = 'month-day';
+        const currDate = new Date(d.getFullYear(), d.getMonth(), i);
+        if (currDate.toDateString() === new Date().toDateString()) cell.style.borderColor = 'var(--accent-blue)';
+        
+        cell.innerHTML = `<span class="day-num">${i}</span>`;
+        
+        const dayEvents = state.events.filter(e => new Date(e.date).toDateString() === currDate.toDateString());
+        dayEvents.forEach(ev => {
+            const pill = document.createElement('div');
+            pill.className = 'month-event-pill';
+            pill.style.borderLeftColor = state.categories[ev.category];
+            pill.innerText = ev.title;
+            pill.onclick = () => openModal(ev);
+            cell.appendChild(pill);
+        });
+
+        UI.monthGrid.appendChild(cell);
+    }
+}
+
+// --- Logic & Events ---
+function setupEventListeners() {
+    document.querySelectorAll('.nav-item').forEach(btn => {
+        btn.onclick = () => {
+            document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            state.view = btn.dataset.view;
+            render();
+        };
+    });
+
+    document.getElementById('prev-date').onclick = () => navigate(-1);
+    document.getElementById('next-date').onclick = () => navigate(1);
+
+    document.getElementById('main-fab').onclick = () => openModal();
+    document.getElementById('cancel-event').onclick = () => UI.modal.classList.add('hidden');
+    
+    UI.eventForm.onsubmit = (e) => {
+        e.preventDefault();
+        const id = document.getElementById('event-id').value;
+        const newEv = {
+            id: id || Date.now().toString(),
+            title: document.getElementById('event-name').value,
+            date: document.getElementById('event-date').value,
+            start: document.getElementById('event-start').value,
+            end: document.getElementById('event-end').value,
+            category: document.getElementById('event-category').value,
+            notes: document.getElementById('event-notes').value
+        };
+
+        if (id) {
+            const index = state.events.findIndex(x => x.id === id);
+            state.events[index] = newEv;
+        } else {
+            state.events.push(newEv);
         }
         
-        const dayEvents = appData.events.filter(e => e.date === dateStr);
-        renderEventsToContainer(dayEvents, col);
-        grid.appendChild(col);
-    }
-}
+        save();
+        UI.modal.classList.add('hidden');
+        render();
+    };
 
-function renderMonthView() {
-    document.getElementById('timeline-body').classList.add('hidden');
-    document.getElementById('timeline-header').classList.add('hidden');
-    const container = document.getElementById('month-view-container');
-    container.classList.remove('hidden');
-    
-    const year = currentDate.getFullYear();
-    const month = currentDate.getMonth();
-    const firstDay = new Date(year, month, 1).getDay() || 7; // Mon=1, Sun=7
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-    
-    let html = '<div class="month-view"><div class="month-header">';
-    ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].forEach(d => html += `<div>${d}</div>`);
-    html += '</div><div class="month-grid">';
-    
-    // Padding
-    for(let i=1; i<firstDay; i++) {
-        html += `<div class="month-day empty"></div>`;
-    }
-    
-    // Days
-    for(let i=1; i<=daysInMonth; i++) {
-        const d = new Date(year, month, i);
-        const dateStr = formatDate(d);
-        const isToday = dateStr === formatDate(new Date());
-        const dayEvents = appData.events.filter(e => e.date === dateStr);
-        
-        let eventsHtml = dayEvents.map(e => `
-            <div class="month-event" style="background-color: ${e.color.replace('var(', '').replace(')', '')}; border-left: 3px solid ${e.color.includes('var') ? `var(--cat-${e.category.toLowerCase()})` : e.color}" data-id="${e.id}">
-                ${e.start} ${e.title}
-            </div>
-        `).join('');
-        
-        html += `<div class="month-day ${isToday ? 'today' : ''}"><div class="month-day-number">${i}</div>${eventsHtml}</div>`;
-    }
-    html += '</div></div>';
-    container.innerHTML = html;
+    document.getElementById('delete-event').onclick = () => {
+        const id = document.getElementById('event-id').value;
+        state.events = state.events.filter(x => x.id !== id);
+        save();
+        UI.modal.classList.add('hidden');
+        render();
+    };
 
-    // Attach delete handlers for month events
-    container.querySelectorAll('.month-event').forEach(el => {
-        el.addEventListener('dblclick', (e) => {
-            e.stopPropagation();
-            if(confirm('Delete this event?')) {
-                const id = el.getAttribute('data-id');
-                appData.events = appData.events.filter(ev => ev.id !== id);
-                saveData();
-                renderCalendar();
-            }
-        });
-    });
-}
+    // Task Logic
+    document.getElementById('add-task-btn').onclick = () => {
+        document.getElementById('task-input-container').classList.toggle('hidden');
+        document.getElementById('new-task-input').focus();
+    };
 
-function renderEventsToContainer(events, container) {
-    events.forEach(ev => {
-        const [startH, startM] = ev.start.split(':').map(Number);
-        const [endH, endM] = ev.end.split(':').map(Number);
-        
-        const top = (startH * 60) + startM;
-        const duration = ((endH * 60) + endM) - top;
-        
-        const block = document.createElement('div');
-        block.className = 'event-block glass-panel';
-        block.style.top = `${top}px`;
-        block.style.height = `${duration}px`;
-        block.style.background = `linear-gradient(135deg, rgba(20,20,20,0.8), rgba(20,20,20,0.9))`;
-        block.style.borderLeftColor = ev.color.includes('var') ? `var(--cat-${ev.category.toLowerCase()})` : ev.color;
-        
-        block.innerHTML = `
-            <div class="event-time">${ev.start} - ${ev.end}</div>
-            <div class="event-title">${ev.title}</div>
-        `;
-        
-        block.addEventListener('dblclick', () => {
-            if(confirm('Delete this time block?')) {
-                appData.events = appData.events.filter(e => e.id !== ev.id);
-                saveData();
-                renderCalendar();
-            }
-        });
-        
-        container.appendChild(block);
-    });
-}
-
-function startClock() {
-    if(clockInterval) clearInterval(clockInterval);
-    
-    function update() {
-        const indicator = document.getElementById('time-indicator');
-        if (indicator) {
-            const now = new Date();
-            const mins = (now.getHours() * 60) + now.getMinutes();
-            indicator.style.top = `${mins}px`;
+    document.getElementById('new-task-input').onkeydown = (e) => {
+        if(e.key === 'Enter' && e.target.value) {
+            state.tasks.push({ id: Date.now(), text: e.target.value, done: false });
+            e.target.value = '';
+            save();
+            renderTasks();
         }
-    }
-    
-    update();
-    clockInterval = setInterval(update, 60000);
+    };
 }
 
-function renderCategories() {
-    const list = document.getElementById('category-list');
-    list.innerHTML = '';
-    appData.categories.forEach(cat => {
-        const li = document.createElement('li');
-        li.className = 'category-item';
-        li.innerHTML = `<div class="cat-dot" style="background: ${cat.color}"></div> <span>${cat.name}</span>`;
-        list.appendChild(li);
-    });
+function openModal(ev = null) {
+    UI.modal.classList.remove('hidden');
+    const delBtn = document.getElementById('delete-event');
+    if (ev) {
+        document.getElementById('modal-title').innerText = "Edit Event";
+        document.getElementById('event-id').value = ev.id;
+        document.getElementById('event-name').value = ev.title;
+        document.getElementById('event-date').value = ev.date;
+        document.getElementById('event-start').value = ev.start;
+        document.getElementById('event-end').value = ev.end;
+        document.getElementById('event-category').value = ev.category;
+        document.getElementById('event-notes').value = ev.notes;
+        delBtn.classList.remove('hidden');
+    } else {
+        document.getElementById('modal-title').innerText = "New Event";
+        UI.eventForm.reset();
+        document.getElementById('event-id').value = '';
+        document.getElementById('event-date').value = state.currentDate.toISOString().split('T')[0];
+        delBtn.classList.add('hidden');
+    }
 }
 
 function renderTasks() {
-    const list = document.getElementById('task-list');
-    list.innerHTML = '';
-    appData.tasks.forEach(task => {
+    UI.taskList.innerHTML = '';
+    state.tasks.forEach(t => {
         const li = document.createElement('li');
-        li.className = `task-item ${task.completed ? 'completed' : ''}`;
-        li.innerHTML = `
-            <div class="task-checkbox">${task.completed ? '<i class="fas fa-check" style="color:white; font-size:10px;"></i>' : ''}</div>
-            <span class="task-text">${task.text}</span>
-        `;
-        li.querySelector('.task-checkbox').addEventListener('click', () => {
-            task.completed = !task.completed;
-            saveData();
-            renderTasks();
-        });
-        list.appendChild(li);
+        li.className = `task-item ${t.done ? 'done' : ''}`;
+        li.innerHTML = `<div class="check-circle"></div> <span>${t.text}</span>`;
+        li.onclick = () => { t.done = !t.done; save(); renderTasks(); };
+        UI.taskList.appendChild(li);
     });
 }
 
-function renderHabits() {
-    const list = document.getElementById('habit-list');
-    list.innerHTML = '';
-    appData.habits.forEach(habit => {
-        const li = document.createElement('li');
-        li.className = 'habit-item';
-        li.innerHTML = `
-            <span>${habit.name}</span>
-            <span class="habit-streak"><i class="fas fa-fire"></i> ${habit.streak}</span>
-        `;
-        list.appendChild(li);
-    });
+function updateStats() {
+    const total = state.tasks.length;
+    const done = state.tasks.filter(x => x.done).length;
+    document.getElementById('tasks-stat').innerText = `${done}/${total}`;
+    document.getElementById('focus-score').innerText = total ? `${Math.round((done/total)*100)}%` : '0%';
 }
 
-function updateDashboardStats() {
-    const total = appData.tasks.length;
-    const completed = appData.tasks.filter(t => t.completed).length;
-    document.getElementById('tasks-stat').textContent = `${completed}/${total}`;
-    
-    const focusScore = total === 0 ? 100 : Math.round((completed / total) * 100);
-    document.getElementById('focus-score').textContent = `${focusScore}%`;
+function updateTimeLine() {
+    const line = document.getElementById('current-time-line');
+    if (!line) return;
+    const now = new Date();
+    const mins = now.getHours() * 60 + now.getMinutes();
+    line.style.top = `${(mins / 60) * 80}px`;
 }
 
-function setupEventListeners() {
-    // View Navigation
-    const views = ['day', 'week', 'month'];
-    views.forEach(v => {
-        document.getElementById(`btn-view-${v}`).addEventListener('click', (e) => {
-            views.forEach(view => document.getElementById(`btn-view-${view}`).classList.remove('active'));
-            e.currentTarget.classList.add('active');
-            currentView = v;
-            renderCalendar();
-        });
-    });
+function startTimeLine() {
+    updateTimeLine();
+    setInterval(updateTimeLine, 60000);
+}
 
-    // Date Navigation
-    document.getElementById('prev-date').addEventListener('click', () => {
-        if (currentView === 'day') currentDate.setDate(currentDate.getDate() - 1);
-        else if (currentView === 'week') currentDate.setDate(currentDate.getDate() - 7);
-        else if (currentView === 'month') currentDate.setMonth(currentDate.getMonth() - 1);
-        renderCalendar();
-    });
+// Pomodoro Timer
+let pomoTime = 1500;
+let pomoInterval = null;
+const pomoDisplay = document.getElementById('pomo-timer');
 
-    document.getElementById('next-date').addEventListener('click', () => {
-        if (currentView === 'day') currentDate.setDate(currentDate.getDate() + 1);
-        else if (currentView === 'week') currentDate.setDate(currentDate.getDate() + 7);
-        else if (currentView === 'month') currentDate.setMonth(currentDate.getMonth() + 1);
-        renderCalendar();
-    });
-
-    // Modal
-    const modal = document.getElementById('event-modal');
-    const fab = document.getElementById('main-fab');
-    const cancelBtn = document.getElementById('cancel-event');
-    const form = document.getElementById('event-form');
-    const dateInput = document.getElementById('event-date');
-
-    fab.addEventListener('click', () => {
-        dateInput.value = formatDate(currentDate);
-        modal.classList.remove('hidden');
-    });
-    
-    cancelBtn.addEventListener('click', () => modal.classList.add('hidden'));
-
-    form.addEventListener('submit', (e) => {
-        e.preventDefault();
-        const title = document.getElementById('event-title').value;
-        const date = document.getElementById('event-date').value;
-        const start = document.getElementById('event-start').value;
-        const end = document.getElementById('event-end').value;
-        const category = document.getElementById('event-category').value;
-        
-        const catObj = appData.categories.find(c => c.name === category);
-        const color = catObj ? catObj.color : '#fff';
-
-        appData.events.push({
-            id: Date.now().toString(),
-            title, date, start, end, category, color
-        });
-        
-        saveData();
-        renderCalendar();
-        modal.classList.add('hidden');
-        form.reset();
-    });
-
-    // Tasks Quick Add
-    const addTaskBtn = document.getElementById('add-task-btn');
-    const taskInputContainer = document.getElementById('task-input-container');
-    const taskInput = document.getElementById('new-task-input');
-
-    addTaskBtn.addEventListener('click', () => {
-        taskInputContainer.classList.toggle('hidden');
-        if(!taskInputContainer.classList.contains('hidden')) taskInput.focus();
-    });
-
-    taskInput.addEventListener('keypress', (e) => {
-        if(e.key === 'Enter' && taskInput.value.trim() !== '') {
-            appData.tasks.push({
-                id: 't' + Date.now(),
-                text: taskInput.value.trim(),
-                completed: false
-            });
-            saveData();
-            renderTasks();
-            taskInput.value = '';
-            taskInputContainer.classList.add('hidden');
-        }
-    });
-
-    // Pomodoro
-    let pomoInterval;
-    let pomoTime = 25 * 60;
-    let isPomoRunning = false;
-    const pomoDisplay = document.getElementById('pomo-timer');
-    const pomoStartBtn = document.getElementById('pomo-start');
-    const pomoResetBtn = document.getElementById('pomo-reset');
-
-    function updatePomoDisplay() {
-        const m = Math.floor(pomoTime / 60).toString().padStart(2, '0');
-        const s = (pomoTime % 60).toString().padStart(2, '0');
-        pomoDisplay.textContent = `${m}:${s}`;
-    }
-
-    pomoStartBtn.addEventListener('click', () => {
-        if(isPomoRunning) {
-            clearInterval(pomoInterval);
-            pomoStartBtn.innerHTML = '<i class="fas fa-play"></i>';
-        } else {
-            pomoInterval = setInterval(() => {
-                if(pomoTime > 0) {
-                    pomoTime--;
-                    updatePomoDisplay();
-                } else {
-                    clearInterval(pomoInterval);
-                    alert("Focus session complete!");
-                    pomoTime = 25 * 60;
-                    updatePomoDisplay();
-                    pomoStartBtn.innerHTML = '<i class="fas fa-play"></i>';
-                    isPomoRunning = false;
-                }
-            }, 1000);
-            pomoStartBtn.innerHTML = '<i class="fas fa-pause"></i>';
-        }
-        isPomoRunning = !isPomoRunning;
-    });
-
-    pomoResetBtn.addEventListener('click', () => {
+document.getElementById('pomo-start').onclick = () => {
+    if (pomoInterval) {
         clearInterval(pomoInterval);
-        isPomoRunning = false;
-        pomoTime = 25 * 60;
-        updatePomoDisplay();
-        pomoStartBtn.innerHTML = '<i class="fas fa-play"></i>';
-    });
-}
+        pomoInterval = null;
+        document.getElementById('pomo-start').innerHTML = '<i class="fas fa-play"></i>';
+    } else {
+        pomoInterval = setInterval(() => {
+            pomoTime--;
+            const m = Math.floor(pomoTime / 60);
+            const s = pomoTime % 60;
+            pomoDisplay.innerText = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+            if (pomoTime <= 0) clearInterval(pomoInterval);
+        }, 1000);
+        document.getElementById('pomo-start').innerHTML = '<i class="fas fa-pause"></i>';
+    }
+};
+document.getElementById('pomo-reset').onclick = () => {
+    clearInterval(pomoInterval);
+    pomoInterval = null;
+    pomoTime = 1500;
+    pomoDisplay.innerText = "25:00";
+    document.getElementById('pomo-start').innerHTML = '<i class="fas fa-play"></i>';
+};
+
+init();
