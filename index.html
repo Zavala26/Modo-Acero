@@ -3,128 +3,47 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nexus OS | Personal Operating System</title>
+    <title>Personal Life Management App</title>
     <link rel="stylesheet" href="style.css">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 </head>
 <body>
-    <div class="app-container">
-        <aside class="sidebar glass-panel">
-            <div class="brand">
-                <i class="fas fa-layer-group neon-blue"></i>
-                <h2>Nexus OS</h2>
+    <div id="app">
+        <header>
+            <h1>My Life Manager</h1>
+            <button id="add-event-btn">+</button>
+        </header>
+        <div id="calendar">
+            <div id="calendar-header"></div>
+            <div id="calendar-body"></div>
+        </div>
+        <div id="task-manager">
+            <h2>Tasks</h2>
+            <div id="task-input">
+                <input type="text" id="task-title" placeholder="Add a new task...">
+                <button id="add-task-btn">Add</button>
             </div>
-            
-            <nav class="main-nav">
-                <button class="nav-item active" data-view="day"><i class="fas fa-calendar-day"></i> <span>Day</span></button>
-                <button class="nav-item" data-view="week"><i class="fas fa-calendar-week"></i> <span>Week</span></button>
-                <button class="nav-item" data-view="month"><i class="fas fa-calendar-alt"></i> <span>Month</span></button>
-            </nav>
-
-            <div class="categories-section">
-                <h3>Life Categories</h3>
-                <ul id="category-list" class="category-list">
-                    <li class="category-item"><div class="cat-dot" style="background: #3b82f6"></div> <span>Work</span></li>
-                    <li class="category-item"><div class="cat-dot" style="background: #10b981"></div> <span>Health</span></li>
-                    <li class="category-item"><div class="cat-dot" style="background: #f43f5e"></div> <span>Marriage</span></li>
-                    <li class="category-item"><div class="cat-dot" style="background: #8b5cf6"></div> <span>Spiritual</span></li>
-                </ul>
-            </div>
-        </aside>
-
-        <main class="main-content">
-            <header class="top-header glass-panel">
-                <div class="date-controls">
-                    <button id="prev-date" class="nav-arrow"><i class="fas fa-chevron-left"></i></button>
-                    <div class="date-display">
-                        <h1 id="current-date-title">Today</h1>
-                        <p id="current-date-subtitle">...</p>
-                    </div>
-                    <button id="next-date" class="nav-arrow"><i class="fas fa-chevron-right"></i></button>
-                </div>
-                <div class="dashboard-stats">
-                    <div class="stat-card">
-                        <span class="stat-label">Focus Score</span>
-                        <span class="stat-value neon-purple" id="focus-score">0%</span>
-                    </div>
-                    <div class="stat-card">
-                        <span class="stat-label">Progress</span>
-                        <span class="stat-value neon-blue" id="tasks-stat">0/0</span>
-                    </div>
-                </div>
-            </header>
-
-            <div class="calendar-container glass-panel">
-                <div id="timeline-view" class="calendar-view">
-                    <div class="timeline-header">
-                        <div class="time-col-spacer"></div>
-                        <div class="day-columns-header" id="day-columns-header"></div>
-                    </div>
-                    <div class="timeline-scroll-area" id="timeline-scroll-area">
-                        <div class="time-labels-column" id="time-labels"></div>
-                        <div class="grid-content" id="calendar-grid">
-                            <div id="current-time-line" class="time-now-line"></div>
-                        </div>
-                    </div>
-                </div>
-
-                <div id="month-view" class="calendar-view hidden">
-                    <div class="month-grid-header">
-                        <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
-                    </div>
-                    <div class="month-grid-body" id="month-grid-body"></div>
-                </div>
-            </div>
-        </main>
-
-        <aside class="right-panel">
-            <div class="pomodoro-widget glass-panel">
-                <div class="pomo-display neon-blue" id="pomo-timer">25:00</div>
-                <div class="pomo-controls">
-                    <button id="pomo-start"><i class="fas fa-play"></i></button>
-                    <button id="pomo-reset"><i class="fas fa-redo"></i></button>
-                </div>
-            </div>
-
-            <div class="tasks-widget glass-panel">
-                <div class="widget-header">
-                    <h3>Tasks</h3>
-                    <button id="add-task-btn" class="icon-btn"><i class="fas fa-plus"></i></button>
-                </div>
-                <div id="task-input-container" class="task-input-container hidden">
-                    <input type="text" id="new-task-input" placeholder="Enter task...">
-                </div>
-                <ul class="task-list" id="task-list"></ul>
-            </div>
-        </aside>
-
-        <button class="fab" id="main-fab"><i class="fas fa-plus"></i></button>
-
-        <div class="modal-overlay hidden" id="event-modal">
-            <div class="modal glass-panel">
-                <h2 id="modal-title">Event Detail</h2>
-                <form id="event-form">
-                    <input type="hidden" id="event-id">
-                    <input type="text" id="event-name" placeholder="Title" required>
-                    <input type="date" id="event-date" required>
-                    <div class="time-inputs">
-                        <input type="time" id="event-start" required>
-                        <span>to</span>
-                        <input type="time" id="event-end" required>
-                    </div>
-                    <select id="event-category">
-                        <option value="Work">Work</option>
-                        <option value="Health">Health</option>
-                        <option value="Spiritual">Spiritual</option>
-                        <option value="Marriage">Marriage</option>
-                    </select>
-                    <div class="modal-actions">
-                        <button type="button" id="delete-event" class="btn-danger hidden">Delete</button>
-                        <button type="button" id="cancel-event" class="btn-secondary">Cancel</button>
-                        <button type="submit" class="btn-primary">Save</button>
-                    </div>
-                </form>
-            </div>
+            <ul id="task-list"></ul>
+        </div>
+        <div id="productivity-dashboard">
+            <h2>Dashboard</h2>
+            <div id="today-progress"></div>
+            <div id="completed-tasks"></div>
+            <div id="focus-score"></div>
+            <div id="current-activity"></div>
+            <div id="upcoming-schedule"></div>
+        </div>
+        <div id="quotes-panel"></div>
+    </div>
+    <div id="event-modal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Add/Edit Event</h2>
+            <input type="text" id="event-title" placeholder="Event Title">
+            <input type="time" id="event-start">
+            <input type="time" id="event-end">
+            <input type="color" id="event-color">
+            <textarea id="event-notes" placeholder="Notes"></textarea>
+            <button id="save-event-btn">Save Event</button>
         </div>
     </div>
     <script src="app.js"></script>
